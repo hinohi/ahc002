@@ -1,10 +1,14 @@
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::BinaryHeap;
 use std::ops::Range;
+use std::time::{Duration, Instant};
 
 use proconio::input;
+use rand::seq::SliceRandom;
+use rand_pcg::Mcg128Xsl64;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 const L: usize = 50;
-const BEAM_WIDTH: usize = 100;
+const BEAM_WIDTH: usize = 200;
 
 fn make_ranges(rr: &[usize]) -> Vec<(Range<usize>, Range<usize>)> {
     let mut ranges = Vec::new();
@@ -59,20 +63,22 @@ fn make_paths(n: usize, start: usize) -> Vec<Vec<usize>> {
 }
 
 fn main() {
+    const LIMIT: Duration = Duration::from_millis(1800);
+    let start = Instant::now();
     input! {
         s: (usize, usize),
         tt: [u32; L * L],
         pp: [u32; L * L],
     }
-    let ranges = make_ranges(&[0, 17, 34, 50]);
+    let ranges = make_ranges(&[0, 12, 24, 37, 50]);
     let pos = ranges
         .iter()
         .position(|(r0, r1)| r0.contains(&s.0) && r1.contains(&s.1))
         .unwrap();
-    let moves = make_paths(3, pos);
+    let mut moves = make_paths(4, pos);
     eprintln!("{:?}", moves);
 
-    let mut visited = HashSet::new();
+    let mut visited = FxHashSet::default();
     visited.insert(tt[to_pos(s)]);
     let state = State {
         score: pp[to_pos(s)],
@@ -80,8 +86,15 @@ fn main() {
         log: String::new(),
         visited,
     };
+
+    let mut rng = Mcg128Xsl64::new(1);
+    moves.shuffle(&mut rng);
+
     let mut best = (0, String::new());
     for r in moves.iter() {
+        if start.elapsed() > LIMIT {
+            break;
+        }
         let ranges = r.iter().map(|&i| ranges[i].clone()).collect::<Vec<_>>();
         let a = calc(state.clone(), &tt, &pp, &ranges);
         if a.0 > best.0 {
@@ -131,7 +144,7 @@ struct State {
     score: u32,
     pos: (usize, usize),
     log: String,
-    visited: HashSet<u32>,
+    visited: FxHashSet<u32>,
 }
 
 impl Ord for State {
@@ -159,7 +172,7 @@ fn calc_edge0(
     range: &(Range<usize>, Range<usize>),
     next_edge: usize,
 ) -> Vec<State> {
-    let mut edge = HashMap::new();
+    let mut edge = FxHashMap::with_capacity_and_hasher(13, Default::default());
     loop {
         let mut queue = BinaryHeap::with_capacity(BEAM_WIDTH + 1);
         for state in states {
@@ -186,7 +199,7 @@ fn calc_edge1(
     range: &(Range<usize>, Range<usize>),
     next_edge: usize,
 ) -> Vec<State> {
-    let mut edge = HashMap::new();
+    let mut edge = FxHashMap::with_capacity_and_hasher(13, Default::default());
     loop {
         let mut queue = BinaryHeap::with_capacity(BEAM_WIDTH + 1);
         for state in states {
