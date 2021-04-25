@@ -4,7 +4,7 @@ use std::ops::Range;
 use proconio::input;
 
 const L: usize = 50;
-const BEAM_WIDTH: usize = 500;
+const BEAM_WIDTH: usize = 100;
 
 fn make_ranges(rr: &[usize]) -> Vec<(Range<usize>, Range<usize>)> {
     let mut ranges = Vec::new();
@@ -16,24 +16,61 @@ fn make_ranges(rr: &[usize]) -> Vec<(Range<usize>, Range<usize>)> {
     ranges
 }
 
+fn make_paths(n: usize, start: usize) -> Vec<Vec<usize>> {
+    struct S {
+        x: usize,
+        y: usize,
+        path: Vec<usize>,
+    }
+
+    let x = start % n;
+    let y = start / n;
+    let mut states = vec![S {
+        x,
+        y,
+        path: vec![y * n + x],
+    }];
+    loop {
+        let mut next_states = Vec::new();
+        for s in states.iter() {
+            for (dx, dy) in vec![(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                let x = s.x as isize + dx;
+                let y = s.y as isize + dy;
+                if x < 0 || n as isize <= x || y < 0 || n as isize <= y {
+                    continue;
+                }
+                let x = x as usize;
+                let y = y as usize;
+                let i = y * n + x;
+                if s.path.contains(&i) {
+                    continue;
+                }
+                let mut path = s.path.clone();
+                path.push(i);
+                next_states.push(S { x, y, path });
+            }
+        }
+        if next_states.is_empty() {
+            break;
+        }
+        states = next_states;
+    }
+    states.into_iter().map(|s| s.path).collect()
+}
+
 fn main() {
     input! {
         s: (usize, usize),
         tt: [u32; L * L],
         pp: [u32; L * L],
     }
-    let ranges = make_ranges(&[0, 25, 50]);
+    let ranges = make_ranges(&[0, 17, 34, 50]);
     let pos = ranges
         .iter()
         .position(|(r0, r1)| r0.contains(&s.0) && r1.contains(&s.1))
         .unwrap();
-    let moves = match pos {
-        0 => [[0, 2, 3, 1], [0, 1, 3, 2]],
-        1 => [[1, 0, 2, 3], [1, 3, 2, 0]],
-        2 => [[2, 3, 1, 0], [2, 0, 1, 3]],
-        3 => [[3, 1, 0, 2], [3, 2, 0, 1]],
-        _ => unreachable!(),
-    };
+    let moves = make_paths(3, pos);
+    eprintln!("{:?}", moves);
 
     let mut visited = HashSet::new();
     visited.insert(tt[to_pos(s)]);
