@@ -1,1 +1,4 @@
 /target
+out
+tools/target
+tools/in
