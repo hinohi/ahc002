@@ -1,4 +1,4 @@
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::ops::Range;
 
 use proconio::input;
@@ -22,22 +22,79 @@ fn main() {
         tt: [u32; L * L],
         pp: [u32; L * L],
     }
-
-    let ranges = make_ranges(&[0, 16, 34, 50]);
-    eprintln!("{:?}", ranges);
+    let ranges = make_ranges(&[0, 25, 50]);
+    let pos = ranges
+        .iter()
+        .position(|(r0, r1)| r0.contains(&s.0) && r1.contains(&s.1))
+        .unwrap();
+    let (a_ranges, b_ranges) = match pos {
+        0 => ([0, 2, 3, 1], [0, 1, 3, 2]),
+        1 => ([1, 0, 2, 3], [1, 3, 2, 0]),
+        2 => ([2, 3, 1, 0], [2, 0, 1, 3]),
+        3 => ([3, 1, 0, 2], [3, 2, 0, 1]),
+        _ => unreachable!(),
+    };
 
     let mut visited = HashSet::new();
     visited.insert(tt[to_pos(s)]);
-    let states = vec![State {
+    let state = State {
         score: pp[to_pos(s)],
         pos: s,
         log: String::new(),
         visited,
-    }];
-    println!(
-        "{}",
-        calc_edge0(states, &tt, &pp, ranges[0].clone(), 16)[0].log
-    );
+    };
+    let a_ranges = a_ranges
+        .iter()
+        .map(|&i| ranges[i].clone())
+        .collect::<Vec<_>>();
+    let b_ranges = b_ranges
+        .iter()
+        .map(|&i| ranges[i].clone())
+        .collect::<Vec<_>>();
+    let a = calc(state.clone(), &tt, &pp, &a_ranges);
+    let b = calc(state.clone(), &tt, &pp, &b_ranges);
+    eprintln!("{:?}", a);
+    eprintln!("{:?}", b);
+    if a.0 < b.0 {
+        println!("{}", b.1);
+    } else {
+        println!("{}", a.1);
+    }
+}
+
+fn calc(
+    state: State,
+    tt: &[u32],
+    pp: &[u32],
+    ranges: &[(Range<usize>, Range<usize>)],
+) -> (u32, String) {
+    let mut states = vec![state];
+    for i in 0..ranges.len() - 1 {
+        let next_stats = if ranges[i].0 == ranges[i + 1].0 {
+            if ranges[i].1.end == ranges[i + 1].1.start {
+                // 右移動
+                calc_edge1(states.clone(), tt, pp, &ranges[i], ranges[i].1.end - 1)
+            } else {
+                // 左移動
+                calc_edge1(states.clone(), tt, pp, &ranges[i], ranges[i].1.start)
+            }
+        } else {
+            if ranges[i].0.end == ranges[i + 1].0.start {
+                // 下移動
+                calc_edge0(states.clone(), tt, pp, &ranges[i], ranges[i].0.end - 1)
+            } else {
+                // 上移動
+                calc_edge0(states.clone(), tt, pp, &ranges[i], ranges[i].0.start)
+            }
+        };
+        if next_stats.is_empty() {
+            eprintln!("{:?}", ranges);
+            eprintln!("{:?}", i);
+            return calc_bulk(states, tt, pp);
+        }
+        states = next_stats;
+    }
+    calc_bulk(states, tt, pp)
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -70,18 +127,17 @@ fn calc_edge0(
     mut states: Vec<State>,
     tt: &[u32],
     pp: &[u32],
-    range: (Range<usize>, Range<usize>),
+    range: &(Range<usize>, Range<usize>),
     next_edge: usize,
 ) -> Vec<State> {
-    let mut edge = vec![None; 17];
+    let mut edge = HashMap::new();
     loop {
         let mut queue = BinaryHeap::with_capacity(BEAM_WIDTH + 1);
         for state in states {
             if state.pos.0 == next_edge {
-                if edge[state.pos.1].is_none() {
-                    edge[state.pos.1] = Some(state.clone());
-                } else if matches!(edge[state.pos.1], Some(ref s) if s.score < state.score) {
-                    edge[state.pos.1] = Some(state.clone());
+                let s = edge.entry(state.pos.1).or_insert_with(|| state.clone());
+                if s.score < state.score {
+                    *s = state.clone();
                 }
             }
             move_4(&mut queue, &state, tt, pp, &range);
@@ -91,25 +147,24 @@ fn calc_edge0(
         }
         states = queue.into_vec();
     }
-    edge.into_iter().filter_map(|s| s).collect()
+    edge.drain().map(|(_, s)| s).collect()
 }
 
 fn calc_edge1(
     mut states: Vec<State>,
     tt: &[u32],
     pp: &[u32],
-    range: (Range<usize>, Range<usize>),
+    range: &(Range<usize>, Range<usize>),
     next_edge: usize,
 ) -> Vec<State> {
-    let mut edge = vec![None; 17];
+    let mut edge = HashMap::new();
     loop {
         let mut queue = BinaryHeap::with_capacity(BEAM_WIDTH + 1);
         for state in states {
             if state.pos.1 == next_edge {
-                if edge[state.pos.0].is_none() {
-                    edge[state.pos.0] = Some(state.clone());
-                } else if matches!(edge[state.pos.0], Some(ref s) if s.score < state.score) {
-                    edge[state.pos.0] = Some(state.clone());
+                let s = edge.entry(state.pos.0).or_insert_with(|| state.clone());
+                if s.score < state.score {
+                    *s = state.clone();
                 }
             }
             move_4(&mut queue, &state, tt, pp, &range);
@@ -119,15 +174,10 @@ fn calc_edge1(
         }
         states = queue.into_vec();
     }
-    edge.into_iter().filter_map(|s| s).collect()
+    edge.drain().map(|(_, s)| s).collect()
 }
 
-fn calc_bulk(
-    mut states: Vec<State>,
-    tt: &[u32],
-    pp: &[u32],
-    range: (Range<usize>, Range<usize>),
-) -> String {
+fn calc_bulk(mut states: Vec<State>, tt: &[u32], pp: &[u32]) -> (u32, String) {
     let mut best = String::new();
     let mut best_score = 0;
     loop {
@@ -137,14 +187,14 @@ fn calc_bulk(
                 best_score = state.score;
                 best = state.log.clone();
             }
-            move_4(&mut queue, &state, tt, pp, &range);
+            move_4(&mut queue, &state, tt, pp, &(0..L, 0..L));
         }
         if queue.is_empty() {
             break;
         }
         states = queue.into_vec();
     }
-    best
+    (best_score, best)
 }
 
 fn move_4(
