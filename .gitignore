@@ -2,3 +2,4 @@
 out
 tools/target
 tools/in
+tools/*.svg
