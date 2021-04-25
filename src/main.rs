@@ -4,7 +4,7 @@ use std::ops::Range;
 use proconio::input;
 
 const L: usize = 50;
-const BEAM_WIDTH: usize = 1_000;
+const BEAM_WIDTH: usize = 500;
 
 fn make_ranges(rr: &[usize]) -> Vec<(Range<usize>, Range<usize>)> {
     let mut ranges = Vec::new();
@@ -27,11 +27,11 @@ fn main() {
         .iter()
         .position(|(r0, r1)| r0.contains(&s.0) && r1.contains(&s.1))
         .unwrap();
-    let (a_ranges, b_ranges) = match pos {
-        0 => ([0, 2, 3, 1], [0, 1, 3, 2]),
-        1 => ([1, 0, 2, 3], [1, 3, 2, 0]),
-        2 => ([2, 3, 1, 0], [2, 0, 1, 3]),
-        3 => ([3, 1, 0, 2], [3, 2, 0, 1]),
+    let moves = match pos {
+        0 => [[0, 2, 3, 1], [0, 1, 3, 2]],
+        1 => [[1, 0, 2, 3], [1, 3, 2, 0]],
+        2 => [[2, 3, 1, 0], [2, 0, 1, 3]],
+        3 => [[3, 1, 0, 2], [3, 2, 0, 1]],
         _ => unreachable!(),
     };
 
@@ -43,23 +43,15 @@ fn main() {
         log: String::new(),
         visited,
     };
-    let a_ranges = a_ranges
-        .iter()
-        .map(|&i| ranges[i].clone())
-        .collect::<Vec<_>>();
-    let b_ranges = b_ranges
-        .iter()
-        .map(|&i| ranges[i].clone())
-        .collect::<Vec<_>>();
-    let a = calc(state.clone(), &tt, &pp, &a_ranges);
-    let b = calc(state.clone(), &tt, &pp, &b_ranges);
-    eprintln!("{:?}", a);
-    eprintln!("{:?}", b);
-    if a.0 < b.0 {
-        println!("{}", b.1);
-    } else {
-        println!("{}", a.1);
+    let mut best = (0, String::new());
+    for r in moves.iter() {
+        let ranges = r.iter().map(|&i| ranges[i].clone()).collect::<Vec<_>>();
+        let a = calc(state.clone(), &tt, &pp, &ranges);
+        if a.0 > best.0 {
+            best = a;
+        }
     }
+    println!("{}", best.1);
 }
 
 fn calc(
